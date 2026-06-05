@@ -19,6 +19,7 @@ UPLOAD_DIR = "uploads"
 DB_DIR = "chroma_db"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+groq_api_key = os.getenv("GROQ_API_KEY")
 
 embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
