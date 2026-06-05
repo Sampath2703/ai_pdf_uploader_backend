@@ -16,19 +16,21 @@ from langchain_core.output_parsers import StrOutputParser
 app = FastAPI()
 
 UPLOAD_DIR = "uploads"
-DB_DIR = "chroma_db"
+DB_DIR = "/tmp/chroma_db"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-groq_api_key = os.getenv("GROQ_API_KEY")
+os.makedirs(DB_DIR, exist_ok=True)
 
-embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+def get_embedding_model():
+    return HuggingFaceEmbeddings(
+        model_name="sentence-transformers/paraphrase-MiniLM-L3-v2"
+    )
 
-llm = ChatGroq(
-    groq_api_key="groq_api_key",
-    model_name="llama-3.3-70b-versatile"
-)
+def get_llm():
+    return ChatGroq(
+        groq_api_key=os.getenv("GROQ_API_KEY"),
+        model_name="llama-3.3-70b-versatile"
+    )
 
 @app.get("/")
 def home():
@@ -36,6 +38,8 @@ def home():
 
 @app.post("/upload_pdf")
 def upload_pdf(file: UploadFile = File(...)):
+    embedding_model = get_embedding_model()
+
     file_path = os.path.join(UPLOAD_DIR, file.filename)
 
     with open(file_path, "wb") as f:
@@ -64,19 +68,29 @@ class Question(BaseModel):
 
 @app.post("/get_answer")
 def get_answer(data: Question):
+    embedding_model = get_embedding_model()
+    llm = get_llm()
 
     vectordb = Chroma(
         persist_directory=DB_DIR,
         embedding_function=embedding_model
     )
 
-    retriever = vectordb.as_retriever(search_kwargs={"k": 3})
+    retriever = vectordb.as_retriever(
+        search_kwargs={"k": 3}
+    )
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
 
     prompt = ChatPromptTemplate.from_template(
-        "Context:\n{context}\n\nQuestion:\n{input}"
+        """
+Context:
+{context}
+
+Question:
+{input}
+"""
     )
 
     chain = (
